@@ -3,6 +3,9 @@ from db.models import HotelTable
 from flask_jwt_extended import jwt_required
 import sqlite3
 
+# normalize_path_params will set a default search, so if the user try to search for hotels 
+# the pre set search must show results within the most vast range.
+
 
 def normalize_path_params(city=None,
                         stars_min = 0,
@@ -21,6 +24,7 @@ def normalize_path_params(city=None,
             "limit": limit,
             "offset": offset
             }
+
     return {"stars_min": stars_min,
             "stars_max": stars_max,
             "price_min": price_min,
@@ -31,6 +35,7 @@ def normalize_path_params(city=None,
     
 
 # path /hotels?city=city&stars_min=4&price_max=500 => example of the querys that we want.
+
 path_params = reqparse.RequestParser()
 path_params.add_argument("city", type=str)
 path_params.add_argument("stars_min", type=float)
@@ -42,13 +47,20 @@ path_params.add_argument("offset", type=float)   # quantity of elements to jump
 
 
 
+# In the GET resquest when the user apply a filter and don't specify the city, for example:
+# data = {"stars_min": 4.0, "city": None}
+# the result for city will be None, and that may cause a problem within the results.
+# that's why valid_data will only show the keys that have a value != than None
+# 
+
+
 class Hotels(Resource):
     def get(self):
-        connection = sqlite3.connect("hotels.db")
+        connection = sqlite3.connect("hotels.db")  
         cursor = connection.cursor()
 
         data = path_params.parse_args()
-        valid_data = {key:data[key] for key in data if data[key] is not None}
+        valid_data = {key:data[key] for key in data if data[key] is not None}  
         params = normalize_path_params(**valid_data)
 
         if not params.get("city"):
@@ -56,6 +68,10 @@ class Hotels(Resource):
                 WHERE (stars > ? and stars < ?) \
                 and (price > ? and price < ?) \
                 LIMIT ? OFFSET ?"
+            
+            # in params the result is a dict, but a tuple is necessary
+            # using list comprehension we can get the values for each key
+            # in combine with tuple() the required tuple will be generated.
 
             tupla = tuple([params[keys] for keys in params])
             results = cursor.execute(consult, tupla)
@@ -96,7 +112,7 @@ class Hotel(Resource):
             return hotel.json()
         return {"message": "Hotel not found."}, 404
 
-    @jwt_required()
+    @jwt_required()   # will require token generated when login to do this request
     def post(self, hotel_id):
         if HotelTable.find_hotel(hotel_id):
             return {"message": "Hotel id '{}' already exists.".format(hotel_id)}, 400    # BAD REQUEST
