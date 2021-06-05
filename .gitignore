@@ -142,3 +142,6 @@ cython_debug/
 
 # Vs code
 .vscode
+
+# tests.py - Made to learn how to consume an API via PowerShell
+tests.py

@@ -1,40 +1,11 @@
+from db.site import SiteTable
 from flask_restful import Resource, reqparse
 from db.models import HotelTable
 from flask_jwt_extended import jwt_required
+from resources.filters import *
 import sqlite3
 
-# normalize_path_params will set a default search, so if the user try to search for hotels 
-# the pre set search must show results within the most vast range.
 
-
-def normalize_path_params(city=None,
-                        stars_min = 0,
-                        stars_max = 5,
-                        price_min = 0,
-                        price_max = 10000,
-                        limit = 50,
-                        offset = 0, **data):
-    if city:
-        return {
-            "stars_min": stars_min,
-            "stars_max": stars_max,
-            "price_min": price_min,
-            "price_max": price_max,
-            "city": city,
-            "limit": limit,
-            "offset": offset
-            }
-
-    return {"stars_min": stars_min,
-            "stars_max": stars_max,
-            "price_min": price_min,
-            "price_max": price_max,
-            "limit": limit,
-            "offset": offset
-            }
-    
-
-# path /hotels?city=city&stars_min=4&price_max=500 => example of the querys that we want.
 
 path_params = reqparse.RequestParser()
 path_params.add_argument("city", type=str)
@@ -51,8 +22,6 @@ path_params.add_argument("offset", type=float)   # quantity of elements to jump
 # data = {"stars_min": 4.0, "city": None}
 # the result for city will be None, and that may cause a problem within the results.
 # that's why valid_data will only show the keys that have a value != than None
-# 
-
 
 class Hotels(Resource):
     def get(self):
@@ -64,26 +33,17 @@ class Hotels(Resource):
         params = normalize_path_params(**valid_data)
 
         if not params.get("city"):
-            consult = "SELECT * FROM hotels \
-                WHERE (stars > ? and stars < ?) \
-                and (price > ? and price < ?) \
-                LIMIT ? OFFSET ?"
-            
             # in params the result is a dict, but a tuple is necessary
             # using list comprehension we can get the values for each key
             # in combine with tuple() the required tuple will be generated.
 
             tupla = tuple([params[keys] for keys in params])
-            results = cursor.execute(consult, tupla)
+            results = cursor.execute(no_city_consult, tupla)
 
         else:
-            consult = "SELECT * FROM hotels \
-                WHERE (stars > ? and stars < ?) \
-                and (price > ? and price < ?) \
-                and city = ? LIMIT ? OFFSET ?"
             
             tupla = tuple([params[keys] for keys in params])
-            results = cursor.execute(consult, tupla)
+            results = cursor.execute(city_consult, tupla)
 
         hotels = []
         for line in results:
@@ -92,7 +52,8 @@ class Hotels(Resource):
                 "name": line[1],
                 "stars": line[2],
                 "price": line[3],
-                "city": line[4]
+                "city": line[4],
+                "site_id": line[5]
             })
 
         return {"hotels": hotels}
@@ -104,6 +65,7 @@ class Hotel(Resource):
     arguments.add_argument("stars", type=float, required=True, help="This field cannot be left blank")
     arguments.add_argument("price")
     arguments.add_argument("city")
+    arguments.add_argument("site_id", type=int, required=True, help="Every hotel must have a linked site")
 
 
     def get(self, hotel_id):
@@ -119,6 +81,9 @@ class Hotel(Resource):
 
         data = Hotel.arguments.parse_args()
         hotel = HotelTable(hotel_id, **data)
+
+        if not SiteTable.find_by_id(data.get('site_id')):
+            return {"message": "The hotel must be associated to a valid site id"}, 400
 
         try:
             hotel.save_hotel()
