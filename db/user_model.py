@@ -7,17 +7,20 @@ class UserTable(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     login = db.Column(db.String(40))
     password = db.Column(db.String(40))
+    activated = db.Column(db.Boolean, default=False)
 
 
-    def __init__(self, login, password ):
+    def __init__(self, login, password, activated):
         self.login = login
         self.password = password
+        self.activated = activated
         
 
     def json(self):
         return {
             "user_id": self.user_id,
-            "login": self.login, 
+            "login": self.login,
+            "activated": self.activated 
         }
     
     

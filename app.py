@@ -1,10 +1,9 @@
 from blacklist import BLACKLIST
-from resources.user import User, UserLogin
 from flask import Flask, jsonify
 from flask_restful import Api
 from sql_alchemy import db
 from resources.hotels import Hotels, Hotel
-from resources.user import User, UserRegister, UserLogin, UserLogout
+from resources.user import User, UserRegister, UserLogin, UserLogout, UserConfirm
 from resources.sites import Site, Sites
 from flask_jwt_extended import JWTManager
 
@@ -46,6 +45,8 @@ api.add_resource(UserLogout, '/logout')
 api.add_resource(Sites, '/sites')
 
 api.add_resource(Site, '/sites/<string:url>')
+
+api.add_resource(UserConfirm, '/confirmation/<int:user_id>')
 
 
 db.init_app(app)

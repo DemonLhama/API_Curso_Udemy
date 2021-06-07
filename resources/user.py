@@ -9,6 +9,7 @@ from blacklist import BLACKLIST
 attributes = reqparse.RequestParser()
 attributes.add_argument("login", type=str, required=True, help="This field cannot be left blank.")
 attributes.add_argument("password", type=str, required=True, help="This field cannot be left blank.")
+attributes.add_argument("activated", type=bool)
 
 
 
@@ -40,6 +41,7 @@ class UserRegister(Resource):
             return {"message": "The login '{}' already exists.".format(data['login'])}
 
         user = UserTable(**data)
+        user.activated = False
         user.save_user()
         return {"message": "User sucesfully created"}, 201  # CREATED
 
@@ -58,10 +60,12 @@ class UserLogin(Resource):
         user = UserTable.find_by_login(data["login"])
 
         if user and safe_str_cmp(user.password, data["password"]):
-            token = create_access_token(identity=user.user_id)
-            return {"access_token": token}, 200
-
+            if user.activated:
+                token = create_access_token(identity=user.user_id)
+                return {"access_token": token}, 200
+            return {"message": "User not confirmed"}, 400
         return {"message": "The username or password incorrect."}, 401  #UNAUTHORIZED
+
 
 class UserLogout(Resource):
 
@@ -70,4 +74,19 @@ class UserLogout(Resource):
         jwt_id = get_jwt()['jti']  # JWT Token Identifier
         BLACKLIST.add(jwt_id)
         return {"message": "Logged out successfully."}, 200
+
+
+class UserConfirm(Resource):
+    # /confirmation/{user_id}
+    @classmethod
+    def get(cls, user_id):
+        user = UserTable.find_user(user_id)
+
+        if not user:
+            return {"message": "User id '{}' not found.".format(user_id)}
+
+        user.activated = True
+        user.save_user()
+        return {"message": "User id '{}' confirmed successfully".format(user_id)}, 200
+
 
